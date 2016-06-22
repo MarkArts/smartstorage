@@ -39,7 +39,6 @@ var web = new WebClient(token);//, {logLevel: 'debug'});
 
 // If board is connected
 board.on("ready", function() {
-  // Connect analog pin
   this.pinMode(0, five.Pin.ANALOG);
   this.analogRead(0, function(voltage) {
     setState(voltage);
@@ -47,12 +46,18 @@ board.on("ready", function() {
   });
 });
 
+var lastVoltage = 0;
 function setState(voltage)
 {
-  if(voltage <= 400){
-    state.needs_refill = false;
-  }else {
-    state.needs_refill = true;
+  if(Math.abs(voltage - lastVoltage) > 400)
+  {
+    if(voltage <= 1000){
+      state.needs_refill = true;
+    }else {
+      state.needs_refill = false;
+    }
+
+    lastVoltage = voltage;
   }
 }
 
