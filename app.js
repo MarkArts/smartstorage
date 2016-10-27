@@ -8,8 +8,7 @@ var WEB_CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS.WEB;
 var WebClient = require('@slack/client').WebClient;
 var Promise = require("bluebird");
 
-var channel_materials = "C1K40Q7QT";
-var token = process.env.SLACK_API_TOKEN || 'Your key here';
+require('dotenv').config();
 
 var state = {
   "needs_refill": false
@@ -32,9 +31,9 @@ var pins = [
 
 
 
-var rtm = new RtmClient(token);//, {logLevel: 'debug'});
+var rtm = new RtmClient(process.env.SLACK_API_TOKEN);//, {logLevel: 'debug'});
 rtm.start();
-var web = new WebClient(token);//, {logLevel: 'debug'});
+var web = new WebClient(process.env.SLACK_API_TOKEN);//, {logLevel: 'debug'});
 
 
 // If board is connected
@@ -87,11 +86,11 @@ rtm.on(RTM_EVENTS.CHANNEL_CREATED, function (message) {
 rtm.on(RTM_CLIENT_EVENTS.RTM_CONNECTION_OPENED, function () {
   // This will send the message 'this is a test message' to the channel identified by id 'C0CHZA86Q'
 
-  web.pins.list(channel_materials).then(function(pins){
+  web.pins.list(process.env.CHANNEL_MATERIALS).then(function(pins){
     updatePins();
   });
 
-  rtm.sendMessage('this is the weight bot checking in (starting up)', channel_materials, function messageSent() {
+  rtm.sendMessage('this is the weight bot checking in (starting up)', process.env.CHANNEL_MATERIALS, function messageSent() {
     // optionally, you can supply a callback to execute once the message has been sent
   });
 });
@@ -115,10 +114,10 @@ function updatePins()
 }
 
 function clearPins(){
-    return web.pins.list(channel_materials).then(function(pins){
+    return web.pins.list(process.env.CHANNEL_MATERIALS).then(function(pins){
       return Promise.map(pins.items, function(p){
         if(p.type == "message"){
-          return web.pins.remove(channel_materials, {timestamp: p.message.ts});
+          return web.pins.remove(process.env.CHANNEL_MATERIALS, {timestamp: p.message.ts});
         }else{
           return new Promise(function(resolve, reject){
             resolve();
@@ -130,11 +129,11 @@ function clearPins(){
 
 function pinMaterials(){
   return new Promise(function(resolve, reject) {
-    rtm.sendMessage(createMaterialMessage(), channel_materials, function messageSent(err, res) {
+    rtm.sendMessage(createMaterialMessage(), process.env.CHANNEL_MATERIALS, function messageSent(err, res) {
       if(err){
         reject(err);
       }else{
-        resolve(web.pins.add(channel_materials, {
+        resolve(web.pins.add(process.env.CHANNEL_MATERIALS, {
             timestamp: res.ts
         }));
       }
