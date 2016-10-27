@@ -1,6 +1,7 @@
 var five = require("johnny-five");
-var board = new five.Board();
+//var board = new five.Board();
 var RtmClient = require('@slack/client').RtmClient;
+var MemoryDataStore = require('@slack/client').MemoryDataStore;
 var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 var RTM_EVENTS = require('@slack/client').RTM_EVENTS;
 var RTM_CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS.RTM;
@@ -16,34 +17,37 @@ var state = {
 
 var pins = [
   {
-    "name": "Wood",
+    "name": "kleine 3mm plan",
     "status": "full"
   },
   {
-    "name": "Plastic",
+    "name": "Polyester",
     "status": "full"
   },
   {
-    "name": "Glass",
+    "name": "Glas",
     "status": "full"
   }
 ];
 
 
 
-var rtm = new RtmClient(process.env.SLACK_API_TOKEN);//, {logLevel: 'debug'});
+var rtm = new RtmClient(process.env.SLACK_API_TOKEN, {
+  dataStore: new MemoryDataStore()
+});//, {logLevel: 'debug'});
+var dm = false;
 rtm.start();
 var web = new WebClient(process.env.SLACK_API_TOKEN);//, {logLevel: 'debug'});
 
 
 // If board is connected
-board.on("ready", function() {
-  this.pinMode(0, five.Pin.ANALOG);
-  this.analogRead(0, function(voltage) {
-    setState(voltage);
-    checkState();
-  });
-});
+//board.on("ready", function() {
+//  this.pinMode(0, five.Pin.ANALOG);
+//  this.analogRead(0, function(voltage) {
+//    setState(voltage);
+//    checkState();
+//  });
+//});
 
 var lastVoltage = 0;
 function setState(voltage)
@@ -64,8 +68,13 @@ var lastState = state;
 function checkState()
 {
   if(lastState.needs_refill != state.needs_refill){
-    updatePins();
     console.log('change');
+    updatePins().then(function(){
+      console.log('test');
+      if(state.needs_refill){
+        notifyEmpty();
+      }
+    });
   }
 
   lastState = JSON.parse(JSON.stringify(state));
@@ -84,13 +93,13 @@ rtm.on(RTM_EVENTS.CHANNEL_CREATED, function (message) {
 });
 
 rtm.on(RTM_CLIENT_EVENTS.RTM_CONNECTION_OPENED, function () {
-  // This will send the message 'this is a test message' to the channel identified by id 'C0CHZA86Q'
+  // This will send the message 'this is a test message' to the channel identified by id 'process.env.SLACK_CHANNEL_MATERIALS'
 
-  web.pins.list(process.env.CHANNEL_MATERIALS).then(function(pins){
+  web.pins.list(process.env.SLACK_CHANNEL_MATERIALS).then(function(pins){
     updatePins();
   });
 
-  rtm.sendMessage('this is the weight bot checking in (starting up)', process.env.CHANNEL_MATERIALS, function messageSent() {
+  rtm.sendMessage('this is the weight bot checking in (starting up)', process.env.SLACK_CHANNEL_MATERIALS, function messageSent() {
     // optionally, you can supply a callback to execute once the message has been sent
   });
 });
@@ -104,20 +113,24 @@ var updatePromise = false;
 var updating = false;
 function updatePins()
 {
-  if(!updatePromise || !updating)
-  {
-    updatePromise = clearPins().then(pinMaterials);
-  }else
-  {
-    updatePromise = updatePromise.then(clearPins().then(pinMaterials));
-  }
+  return new Promise(function(resolve, reject){
+    if(!updatePromise || !updating)
+    {
+      updatePromise = clearPins().then(pinMaterials);
+    }else
+    {
+      updatePromise = updatePromise.then(clearPins().then(pinMaterials));
+    }
+
+    resolve(updatePromise);
+  });
 }
 
 function clearPins(){
-    return web.pins.list(process.env.CHANNEL_MATERIALS).then(function(pins){
+    return web.pins.list(process.env.SLACK_CHANNEL_MATERIALS).then(function(pins){
       return Promise.map(pins.items, function(p){
         if(p.type == "message"){
-          return web.pins.remove(process.env.CHANNEL_MATERIALS, {timestamp: p.message.ts});
+          return web.pins.remove(process.env.SLACK_CHANNEL_MATERIALS, {timestamp: p.message.ts});
         }else{
           return new Promise(function(resolve, reject){
             resolve();
@@ -129,11 +142,11 @@ function clearPins(){
 
 function pinMaterials(){
   return new Promise(function(resolve, reject) {
-    rtm.sendMessage(createMaterialMessage(), process.env.CHANNEL_MATERIALS, function messageSent(err, res) {
+    rtm.sendMessage(createMaterialMessage(), process.env.SLACK_CHANNEL_MATERIALS, function messageSent(err, res) {
       if(err){
         reject(err);
       }else{
-        resolve(web.pins.add(process.env.CHANNEL_MATERIALS, {
+        resolve(web.pins.add(process.env.SLACK_CHANNEL_MATERIALS, {
             timestamp: res.ts
         }));
       }
@@ -141,7 +154,33 @@ function pinMaterials(){
   });
 }
 
+function notifyEmpty(){
+  return new Promise(function(resolve, reject) {
+    var user = rtm.dataStore.getUserById(process.env.SLACK_NOTIFY_ID)
+    var dm = rtm.dataStore.getDMByName(user.name);
+
+    rtm.sendMessage(createEmptyMessage(), dm.id);
+  });
+}
+
+function createEmptyMessage(){
+  return "`kleine 3mm plank` is laag"
+}
+
 function createMaterialMessage(){
-  pins[0].status = (state.needs_refill) ? "needs refill" : "full";
-  return pins.reduce( (acc, material) => acc + material.name + ": " + material.status + "\n", '');
+  pins[0].status = (state.needs_refill) ? "Laag" : "Vol";
+  return "```" + pins.reduce( (acc, material) => acc + material.name + ": " + material.status + "\n", '') + "```";
+}
+
+/* Tests */
+rtm.on(RTM_CLIENT_EVENTS.RTM_CONNECTION_OPENED, function () {
+  setInterval(function () {
+    test_change_state();
+  }, 4800);
+});
+
+test_change_state = function(){
+  console.log("Change_state");
+  state.needs_refill = !state.needs_refill;
+  checkState();
 }
