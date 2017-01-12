@@ -11,22 +11,25 @@ var Promise = require("bluebird");
 
 require('dotenv').config();
 
-var state = {
-  "needs_refill": false
-};
+StateEnum = {
+    EMPTY : "Leeg",
+    NEEDS_REFIL : "Bijna Leeg",
+    MIDDLE : "Gemiddeld",
+    FULL : "Vol"
+}
 
 var pins = [
   {
     "name": "kleine 3mm plan",
-    "status": "full"
+    "state": StateEnum.FULL
   },
   {
     "name": "Polyester",
-    "status": "full"
+    "state": StateEnum.MIDDLE
   },
   {
     "name": "Glas",
-    "status": "full"
+    "state": StateEnum.FULL
   }
 ];
 
@@ -55,29 +58,34 @@ function setState(voltage)
   if(Math.abs(voltage - lastVoltage) > 400)
   {
     if(voltage <= 1000){
-      state.needs_refill = true;
+      pins[0].state = StateEnum.NEEDS_REFIL
     }else {
-      state.needs_refill = false;
+      pins[0].state = StateEnum.FUll
     }
 
     lastVoltage = voltage;
   }
 }
 
-var lastState = state;
+var lastPins = JSON.parse(JSON.stringify(pins));
 function checkState()
 {
-  if(lastState.needs_refill != state.needs_refill){
+  if( JSON.stringify(lastPins) != JSON.stringify(pins) ){
     console.log('change');
-    updatePins().then(function(){
-      console.log('test');
-      if(state.needs_refill){
-        notifyEmpty();
+
+    for (var i = 0; i < pins.length; i++) {
+      if(JSON.stringify(pins[i]) !== JSON.stringify(lastPins[i])){
+        console.log(pins[i].name + " changed");
+        if(pins[i].state == StateEnum.NEEDS_REFIL || pins[i].state == StateEnum.EMPTY){
+          notify(pins[i]);
+        }
       }
-    });
+    }
+
+    updatePins();
   }
 
-  lastState = JSON.parse(JSON.stringify(state));
+  lastPins = JSON.parse(JSON.stringify(pins));
 }
 
 rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, function (rtmStartData) {
@@ -85,7 +93,7 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, function (rtmStartData) {
 });
 
 rtm.on(RTM_EVENTS.MESSAGE, function (message) {
-  console.log("message: "+ message);
+  console.log("message: "+ JSON.stringify(message));
 });
 
 rtm.on(RTM_EVENTS.CHANNEL_CREATED, function (message) {
@@ -154,22 +162,21 @@ function pinMaterials(){
   });
 }
 
-function notifyEmpty(){
+function notify(pin){
   return new Promise(function(resolve, reject) {
     var user = rtm.dataStore.getUserById(process.env.SLACK_NOTIFY_ID)
     var dm = rtm.dataStore.getDMByName(user.name);
 
-    rtm.sendMessage(createEmptyMessage(), dm.id);
+    rtm.sendMessage(createMessage(pin), dm.id);
   });
 }
 
-function createEmptyMessage(){
-  return "`kleine 3mm plank` is laag"
+function createMessage(pin){
+  return "`"+pin.name+"` "+pin.state+""
 }
 
 function createMaterialMessage(){
-  pins[0].status = (state.needs_refill) ? "Laag" : "Vol";
-  return "```" + pins.reduce( (acc, material) => acc + material.name + ": " + material.status + "\n", '') + "```";
+  return "```" + pins.reduce( (acc, material) => acc + material.name + ": " + material.state + "\n", '') + "```";
 }
 
 /* Tests */
@@ -181,6 +188,6 @@ rtm.on(RTM_CLIENT_EVENTS.RTM_CONNECTION_OPENED, function () {
 
 test_change_state = function(){
   console.log("Change_state");
-  state.needs_refill = !state.needs_refill;
+  pins[0].state = StateEnum.NEEDS_REFIL
   checkState();
 }
