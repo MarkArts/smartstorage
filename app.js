@@ -20,7 +20,7 @@ StateEnum = {
 
 var pins = [
   {
-    "name": "kleine 3mm plan",
+    "name": "kleine 3mm plank",
     "state": StateEnum.FULL
   },
   {
@@ -28,8 +28,16 @@ var pins = [
     "state": StateEnum.MIDDLE
   },
   {
-    "name": "Glas",
+    "name": "Glasplaat",
     "state": StateEnum.FULL
+  },
+  {
+    "name": "Grote 3mm plank",
+    "state": StateEnum.FULL
+  },
+  {
+    "name": "Hout resten",
+    "state": StateEnum.MIDDLE
   }
 ];
 
@@ -181,13 +189,19 @@ function createMaterialMessage(){
 
 /* Tests */
 rtm.on(RTM_CLIENT_EVENTS.RTM_CONNECTION_OPENED, function () {
-  setInterval(function () {
-    test_change_state();
+  setTimeout(function () {
+    console.log("Change_state 1");
+    pins[0].state = StateEnum.NEEDS_REFIL
+    checkState();
   }, 4800);
+  setTimeout(function (){
+    console.log("Change_state 2");
+    pins[1].state = StateEnum.FULL
+    checkState();
+  }, 4800*2);
+  setTimeout(function (){
+    console.log("Change_state 2");
+    pins[2].state = StateEnum.EMPTY
+    checkState();
+  }, 4800*4);
 });
-
-test_change_state = function(){
-  console.log("Change_state");
-  pins[0].state = StateEnum.NEEDS_REFIL
-  checkState();
-}
