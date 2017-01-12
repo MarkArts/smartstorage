@@ -6,9 +6,9 @@
     "template",
     "benchmark"
   ],
-  "repository": "https://github.com/clikex/node-weight-sensor.git",
-  "homepage": "http://clikex.github.com/",
-  "author": "ClikeX <w.s.van.der.meulen@gmail.com>",
+  "repository": "https://github.com/MarkArts/ambient2016.git",
+  "homepage": "https://github.com/MarkArts/ambient2016",
+  "author": "Mark Arts <marktarts93@gmail.com>",
   "dependencies": {
     "@slack/client": "^3.5.0",
     "bluebird": "^3.4.1",
